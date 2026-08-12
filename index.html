@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Contour Level — Phone A-Frame / Bunyip Level</title>
+<meta name="description" content="Turn your phone into an A-frame or bunyip level. Calibrate once, then walk the hill with eyes-free audio feedback to mark swale or drainage lines.">
+<style>
+  :root{
+    --bg:#f3f1ea; --card:#ffffff; --ink:#26251f; --muted:#6b6a5f;
+    --line:#ddd9cc; --accent:#7a5a3d; --accent-ink:#ffffff;
+    --good:#2e7d32; --good-bg:#e6f2e6;
+    --warn:#b3402a; --warn-bg:#f9e8e3;
+    --shadow:0 1px 3px rgba(30,25,10,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#161510; --card:#211f19; --ink:#ece9df; --muted:#a29e8e;
+      --line:#3a362b; --accent:#c99a6c; --accent-ink:#1b1710;
+      --good:#8fd08a; --good-bg:#233721;
+      --warn:#f0a08c; --warn-bg:#3a241d;
+      --shadow:none;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,Segoe UI,Roboto,sans-serif;padding-bottom:3rem;-webkit-tap-highlight-color:transparent}
+  .wrap{max-width:520px;margin:0 auto;padding:0 1.1rem}
+  header{padding:1.8rem 0 .8rem;text-align:center}
+  header h1{font-size:1.55rem;line-height:1.25}
+  header p.sub{color:var(--muted);margin-top:.5rem;font-size:.95rem}
+
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1.4rem 1.2rem;margin-top:1.2rem;box-shadow:var(--shadow);text-align:center}
+  .permBtn,.primary{background:var(--accent);color:var(--accent-ink);border:none;border-radius:12px;padding:.9rem 1.3rem;font-size:1.05rem;font-weight:600;cursor:pointer;width:100%}
+  .secondary{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:.75rem 1.1rem;font-size:.95rem;cursor:pointer;width:100%;margin-top:.6rem}
+  .hidden{display:none !important}
+
+  .readout{font-size:3.4rem;font-weight:700;margin:.9rem 0 .2rem;font-variant-numeric:tabular-nums}
+  .readout.level{color:var(--good)}
+  .readout.off{color:var(--warn)}
+  .unit{font-size:1.1rem;color:var(--muted);margin-bottom:.6rem}
+
+  .bubble-track{position:relative;height:14px;background:var(--line);border-radius:999px;margin:1.1rem 0 1.4rem;overflow:hidden}
+  .bubble-zero{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--muted);transform:translateX(-1px)}
+  .bubble-dot{position:absolute;top:-5px;width:24px;height:24px;border-radius:50%;background:var(--accent);transform:translateX(-12px);transition:left .08s linear,background .15s}
+  .bubble-dot.level{background:var(--good)}
+  .bubble-dot.off{background:var(--warn)}
+
+  .status-line{font-size:.9rem;color:var(--muted);min-height:1.3rem}
+
+  .row{display:flex;gap:.6rem;margin-top:1rem}
+  .row button{flex:1}
+
+  .modes{display:flex;gap:.5rem;justify-content:center;margin-top:1.2rem;flex-wrap:wrap}
+  .modes button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:.5rem 1rem;border-radius:999px;font-size:.9rem;cursor:pointer}
+  .modes button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+  .slope-box{margin-top:.9rem;display:flex;align-items:center;justify-content:center;gap:.6rem}
+  .slope-box input[type=range]{flex:1}
+  .slope-val{min-width:3.6rem;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+
+  .stakebox{margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:1rem}
+  .stakecount{font-size:1.6rem;font-weight:700}
+
+  .howto{margin-top:1.4rem;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.2rem;box-shadow:var(--shadow)}
+  .howto h2{font-size:1.05rem;margin-bottom:.5rem}
+  .howto ol{padding-left:1.1rem;color:var(--muted);font-size:.92rem}
+  .howto li{margin-bottom:.4rem}
+  .howto p.note{margin-top:.6rem;font-size:.85rem;color:var(--muted)}
+
+  footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:2rem}
+  footer a{color:var(--muted)}
+
+  .toggleAudio{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.9rem;font-size:.9rem;color:var(--muted)}
+  .toggleAudio input{width:1.1rem;height:1.1rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Contour Level</h1>
+    <p class="sub">Turn your phone into an A-frame or bunyip level. Calibrate once against your board, then walk the hill and listen — no need to look down.</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <button class="permBtn" id="startBtn">Start</button>
+    <p class="status-line" id="permMsg"></p>
+
+    <div id="live" class="hidden">
+      <div class="readout level" id="readout">0.0°</div>
+      <div class="unit" id="readoutLabel">from level</div>
+
+      <div class="bubble-track">
+        <div class="bubble-zero"></div>
+        <div class="bubble-dot level" id="bubbleDot" style="left:50%"></div>
+      </div>
+
+      <div class="status-line" id="statusLine">Lay the phone flat on your board, then tap Calibrate.</div>
+
+      <div class="row">
+        <button class="secondary" id="calBtn">Calibrate (zero here)</button>
+        <button class="secondary" id="resetCalBtn">Reset</button>
+      </div>
+
+      <div class="modes">
+        <button class="on" id="modeLevel" data-mode="level">Level (swale)</button>
+        <button id="modeSlope" data-mode="slope">Slope offset (ditch)</button>
+      </div>
+
+      <div class="slope-box hidden" id="slopeBox">
+        <label for="slopeRange" style="font-size:.9rem;color:var(--muted)">Target fall</label>
+        <input type="range" id="slopeRange" min="0.5" max="5" step="0.5" value="2">
+        <div class="slope-val" id="slopeVal">2.0%</div>
+      </div>
+
+      <div class="toggleAudio">
+        <input type="checkbox" id="audioToggle" checked>
+        <label for="audioToggle">Audio feedback (eyes-free)</label>
+      </div>
+
+      <div class="stakebox">
+        <button class="secondary" id="stakeBtn" style="width:auto;padding:.6rem 1.2rem">+ Mark stake</button>
+        <div class="stakecount" id="stakeCount">0</div>
+        <button class="secondary" id="stakeResetBtn" style="width:auto;padding:.6rem 1.2rem">Reset count</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="howto">
+    <h2>How to use it</h2>
+    <ol>
+      <li>Mount or hold the phone flat against your A-frame crossbar or bunyip board.</li>
+      <li>Set the tool down on ground you know is level (or use a bubble level to true it up), then tap <strong>Start</strong> and allow motion access.</li>
+      <li>Tap <strong>Calibrate</strong> once — this cancels out any mounting angle, so the phone doesn't have to sit perfectly flat.</li>
+      <li>Walk the hill, pivoting the tool leg to leg. A steady tone means level. The beep speeds up and the pitch rises when one leg is high.</li>
+      <li>Switch to <strong>Slope offset</strong> and drag the slider if you want a gentle fall (1–2%) for a drainage ditch instead of dead-level for a swale.</li>
+      <li>Tap <strong>+ Mark stake</strong> each time you drive a marking stake, just to keep count as you walk.</li>
+    </ol>
+    <p class="note">Works best in a browser tab, screen on, phone mounted to the tool. On iPhone, Safari will ask for a one-time motion &amp; orientation permission — tap Allow. Keep the screen awake in your phone's settings while you work; this page can't do that for you.</p>
+  </div>
+
+  <footer>
+    Free tool, no account needed. Built for people marking swales and drainage lines by hand.
+  </footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var startBtn = document.getElementById('startBtn');
+  var permMsg = document.getElementById('permMsg');
+  var live = document.getElementById('live');
+  var readout = document.getElementById('readout');
+  var readoutLabel = document.getElementById('readoutLabel');
+  var bubbleDot = document.getElementById('bubbleDot');
+  var statusLine = document.getElementById('statusLine');
+  var calBtn = document.getElementById('calBtn');
+  var resetCalBtn = document.getElementById('resetCalBtn');
+  var modeLevelBtn = document.getElementById('modeLevel');
+  var modeSlopeBtn = document.getElementById('modeSlope');
+  var slopeBox = document.getElementById('slopeBox');
+  var slopeRange = document.getElementById('slopeRange');
+  var slopeVal = document.getElementById('slopeVal');
+  var audioToggle = document.getElementById('audioToggle');
+  var stakeBtn = document.getElementById('stakeBtn');
+  var stakeResetBtn = document.getElementById('stakeResetBtn');
+  var stakeCount = document.getElementById('stakeCount');
+
+  var TOLERANCE_DEG = 0.6;      // "level" tolerance window
+  var calibrationOffset = 0;    // degrees, subtracted from raw beta
+  var mode = 'level';           // 'level' | 'slope'
+  var slopePercent = 2.0;
+  var stakes = 0;
+  var lastRawBeta = 0;
+
+  // ---- Audio engine ----
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  var actx = null, osc = null, gainNode = null, beepTimer = null;
+
+  function ensureAudio(){
+    if (!AudioCtx) return false;
+    if (!actx) actx = new AudioCtx();
+    if (actx.state === 'suspended') actx.resume();
+    return true;
+  }
+
+  function stopTone(){
+    if (osc){ try{ osc.stop(); }catch(e){} osc.disconnect(); osc = null; }
+    if (gainNode){ gainNode.disconnect(); gainNode = null; }
+    if (beepTimer){ clearTimeout(beepTimer); beepTimer = null; }
+  }
+
+  // Steady tone when level; pulsed beeps (rate + pitch scale with error) when off.
+  function updateAudio(errorDeg){
+    if (!audioToggle.checked || !ensureAudio()) { stopTone(); return; }
+    var absErr = Math.abs(errorDeg);
+    var isLevel = absErr <= TOLERANCE_DEG;
+
+    if (isLevel){
+      if (beepTimer){ clearTimeout(beepTimer); beepTimer = null; }
+      if (!osc){
+        osc = actx.createOscillator();
+        gainNode = actx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 440;
+        gainNode.gain.value = 0.12;
+        osc.connect(gainNode).connect(actx.destination);
+        osc.start();
+      } else {
+        osc.frequency.setTargetAtTime(440, actx.currentTime, 0.05);
+      }
+    } else {
+      stopTone();
+      scheduleBeep(absErr, errorDeg);
+    }
+  }
+
+  function scheduleBeep(absErr, signedErr){
+    // rate: faster as error grows (200ms at small error down to 60ms at large error)
+    var capped = Math.min(absErr, 15);
+    var rate = Math.max(60, 260 - capped * 13); // ms between beeps
+    // pitch: higher pitch = need to raise that side / general "off" cue.
+    // Use direction to distinguish which way: higher freq when tilted positive, lower when negative.
+    var freq = signedErr > 0 ? (500 + capped * 20) : (380 - capped * 12);
+    freq = Math.max(180, freq);
+
+    playBeep(freq);
+    beepTimer = setTimeout(function(){ scheduleBeep.apply(null, [absErr, signedErr]); }, rate);
+  }
+
+  function playBeep(freq){
+    if (!actx) return;
+    var o = actx.createOscillator();
+    var g = actx.createGain();
+    o.type = 'square';
+    o.frequency.value = freq;
+    g.gain.value = 0.001;
+    o.connect(g).connect(actx.destination);
+    var t = actx.currentTime;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.15, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    o.start(t);
+    o.stop(t + 0.1);
+  }
+
+  // ---- Orientation handling ----
+  function targetDeg(){
+    return mode === 'slope' ? percentToDeg(slopePercent) : 0;
+  }
+  function percentToDeg(p){
+    return Math.atan(p/100) * 180 / Math.PI;
+  }
+
+  function handleOrientation(e){
+    if (e.beta === null || e.beta === undefined) return;
+    lastRawBeta = e.beta;
+    render();
+  }
+
+  function render(){
+    var calibrated = lastRawBeta - calibrationOffset;
+    var target = targetDeg();
+    var error = calibrated - target; // positive = tilted one way past target
+
+    var absErr = Math.abs(error);
+    var isLevel = absErr <= TOLERANCE_DEG;
+
+    readout.textContent = (error >= 0 ? '+' : '') + error.toFixed(1) + '°';
+    readout.className = 'readout ' + (isLevel ? 'level' : 'off');
+    readoutLabel.textContent = mode === 'slope'
+      ? ('from ' + slopePercent.toFixed(1) + '% target fall')
+      : 'from level';
+
+    var pct = 50 + Math.max(-45, Math.min(45, error * 4));
+    bubbleDot.style.left = pct + '%';
+    bubbleDot.className = 'bubble-dot ' + (isLevel ? 'level' : 'off');
+
+    statusLine.textContent = isLevel
+      ? 'Level. Hold steady.'
+      : (error > 0 ? 'High side needs to come down.' : 'Low side needs to come up.');
+
+    updateAudio(error);
+  }
+
+  function startOrientation(){
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'){
+      // iOS 13+
+      DeviceOrientationEvent.requestPermission().then(function(state){
+        if (state === 'granted'){
+          window.addEventListener('deviceorientation', handleOrientation, true);
+          goLive();
+        } else {
+          permMsg.textContent = 'Motion access was denied. Enable it in Settings > Safari > Motion & Orientation Access, then reload this page.';
+        }
+      }).catch(function(err){
+        permMsg.textContent = 'Could not request motion access: ' + err.message;
+      });
+    } else if (window.DeviceOrientationEvent) {
+      // Android / non-gated browsers
+      window.addEventListener('deviceorientation', handleOrientation, true);
+      goLive();
+    } else {
+      permMsg.textContent = 'This device or browser does not support tilt sensors (DeviceOrientationEvent).';
+    }
+  }
+
+  function goLive(){
+    startBtn.classList.add('hidden');
+    permMsg.textContent = '';
+    live.classList.remove('hidden');
+  }
+
+  startBtn.addEventListener('click', function(){
+    ensureAudio();
+    startOrientation();
+  });
+
+  calBtn.addEventListener('click', function(){
+    calibrationOffset = lastRawBeta;
+    statusLine.textContent = 'Calibrated. Zero set to current position.';
+  });
+
+  resetCalBtn.addEventListener('click', function(){
+    calibrationOffset = 0;
+    statusLine.textContent = 'Calibration reset to raw sensor.';
+  });
+
+  modeLevelBtn.addEventListener('click', function(){
+    mode = 'level';
+    modeLevelBtn.classList.add('on');
+    modeSlopeBtn.classList.remove('on');
+    slopeBox.classList.add('hidden');
+    render();
+  });
+
+  modeSlopeBtn.addEventListener('click', function(){
+    mode = 'slope';
+    modeSlopeBtn.classList.add('on');
+    modeLevelBtn.classList.remove('on');
+    slopeBox.classList.remove('hidden');
+    render();
+  });
+
+  slopeRange.addEventListener('input', function(){
+    slopePercent = parseFloat(slopeRange.value);
+    slopeVal.textContent = slopePercent.toFixed(1) + '%';
+    render();
+  });
+
+  stakeBtn.addEventListener('click', function(){
+    stakes++;
+    stakeCount.textContent = stakes;
+  });
+  stakeResetBtn.addEventListener('click', function(){
+    stakes = 0;
+    stakeCount.textContent = stakes;
+  });
+
+  audioToggle.addEventListener('change', function(){
+    if (!audioToggle.checked) stopTone();
+  });
+
+  // ---- Debug hooks for automated testing (devtools / headless verification) ----
+  // Lets a test harness simulate tilt without a real device.
+  window.__debugSimulateTilt = function(betaDeg){
+    handleOrientation({ beta: betaDeg });
+  };
+  window.__debugState = function(){
+    return {
+      lastRawBeta: lastRawBeta,
+      calibrationOffset: calibrationOffset,
+      mode: mode,
+      slopePercent: slopePercent,
+      isLive: !live.classList.contains('hidden')
+    };
+  };
+})();
+</script>
+</body>
+</html>
